@@ -103,10 +103,6 @@
 
     LOGICAL, EXTERNAL :: wrf_dm_on_monitor
 
-    ! Changed T. Raupach.
-    integer :: tmpint
-    ! End changed block.
-
     WRITE(wrf_err_message,*)'output_wrf: begin, fid = ',fid
     CALL wrf_debug( 300 , wrf_err_message )
 
@@ -351,7 +347,7 @@
     CALL wrf_put_dom_ti_char ( fid , 'START_DATE', TRIM(start_date) , ierr )
     IF ( switch .EQ. input_only) THEN
        CALL wrf_put_dom_ti_char ( fid , 'SIMULATION_START_DATE', TRIM(start_date) , ierr )
-    ELSE
+    ELSE IF ( ( switch .EQ. restart_only ) .OR. ( switch .EQ. history_only ) ) THEN
        CALL nl_get_simulation_start_year   ( 1, simulation_start_year   )
        CALL nl_get_simulation_start_month  ( 1, simulation_start_month  )
        CALL nl_get_simulation_start_day    ( 1, simulation_start_day    )
@@ -613,52 +609,6 @@ endif
 #if (EM_CORE == 1)
           CALL wrf_put_dom_ti_char ( fid , 'GRIDTYPE',  'C' , ierr )
 #endif
-
-          ! Changed T. Raupach.
-          call wrf_put_dom_ti_real(fid, "SSTTSK", config_flags%ssttsk, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%light_nudging)
-          call wrf_put_dom_ti_integer(fid, "LIGHT_NUDGING", tmpint, 1, ierr)
-          call wrf_put_dom_ti_real(fid, "LIGHT_NUDGING_TIME", &
-               config_flags%light_nudging_time, 1, ierr)
-          
-          tmpint = merge(1.d0, 0.d0, config_flags%ideal_evaporation)
-          call wrf_put_dom_ti_integer(fid, "IDEAL_EVAPORATION", tmpint, 1, ierr)
-
-          call wrf_put_dom_ti_real(fid, "SURFACE_WIND", &
-               config_flags%surface_wind, 1, ierr)
-          
-          tmpint = merge(1.d0, 0.d0, config_flags%const_rad_cooling)
-          call wrf_put_dom_ti_integer(fid, "CONST_RAD_COOLING", tmpint, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%relax_u_winds)
-          call wrf_put_dom_ti_integer(fid, "RELAX_U_WINDS", tmpint, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%relax_v_winds)
-          call wrf_put_dom_ti_integer(fid, "RELAX_V_WINDS", tmpint, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%extend_wind_relax_u)
-          call wrf_put_dom_ti_integer(fid, "EXTEND_WIND_RELAX_U", tmpint, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%extend_wind_relax_v)
-          call wrf_put_dom_ti_integer(fid, "EXTEND_WIND_RELAX_V", tmpint, 1, ierr)
-          
-          call wrf_put_dom_ti_real(fid, "WIND_RELAXATION_TIME", &
-               config_flags%wind_relaxation_time, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%relax_stratosphere)
-          call wrf_put_dom_ti_integer(fid, "RELAX_STRATOSPHERE", tmpint, 1, ierr)
-          
-          tmpint = merge(1.d0, 0.d0, config_flags%perturb_t)
-          call wrf_put_dom_ti_integer(fid, "PERTURB_T", tmpint, 1, ierr)
-
-          tmpint = merge(1.d0, 0.d0, config_flags%perturb_q)
-          call wrf_put_dom_ti_integer(fid, "PERTURB_Q", tmpint, 1, ierr)
-
-          call wrf_put_dom_ti_real(fid, "P_PERT", config_flags%p_pert, 1, ierr)
-          call wrf_put_dom_ti_real(fid, "TTENDAMP", config_flags%TtendAmp, 1, ierr)
-          call wrf_put_dom_ti_real(fid, "QTENDAMP", config_flags%QtendAmp, 1, ierr)
-          ! End changed block.
 
 ! added these fields for W. Skamarock, 020402, JM
     ibuf(1) = diff_opt
@@ -1029,18 +979,6 @@ endif
       CALL wrf_put_dom_ti_integer ( fid , 'PRODUCTION_STATUS' , config_flags%production_status , 1 , ierr )
       CALL wrf_put_dom_ti_integer ( fid , 'COMPRESSION' , config_flags%compression , 1 , ierr )
     ENDIF
-
-
-CALL wrf_put_dom_ti_logical ( fid , 'PERIODIC_X' , config_flags%periodic_x , 1 , ierr )
-CALL wrf_put_dom_ti_logical ( fid , 'PERIODIC_Y' , config_flags%periodic_y , 1 , ierr )
-
-IF (config_flags%output_avgfluxes) THEN
-    CALL wrf_put_dom_ti_logical ( fid , 'HESSELBERG_AVG' , config_flags%hesselberg_avg , 1 , ierr )
-    CALL wrf_put_dom_ti_real ( fid , 'AVG_INTERVAL' , config_flags%avg_interval , 1 , ierr )
-    IF (config_flags%output_t_fluxes .gt. 0) THEN
-        CALL wrf_put_dom_ti_logical ( fid , 'OUTPUT_DRY_THETA_FLUXES' , config_flags%output_dry_theta_fluxes , 1 , ierr )
-    ENDIF
-ENDIF
 
 #if ( (EM_CORE == 1) && (DA_CORE != 1) )
       save_topo_orig = grid%save_topo_from_real
