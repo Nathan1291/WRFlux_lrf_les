@@ -76,6 +76,9 @@
 !!\html\include sf_sfclayrev_run.html
 !!
  subroutine sf_sfclayrev_run(ux,vx,t1d,qv1d,p1d,dz8w1d,                &
+                             ! Changed T. Raupach 2020.
+                             rho1d, ideal_evap_flag, surface_wind,     &
+                             ! End changed block.
                              cp,g,rovcp,r,xlv,psfcpa,chs,chs2,cqs2,    &
                              cpm,pblh,rmol,znt,ust,mavail,zol,mol,     &
                              regime,psim,psih,fm,fh,                   &
@@ -95,6 +98,13 @@
  logical,intent(in):: isfflx
  logical,intent(in):: shalwater_z0
  logical,intent(in),optional:: scm_force_flux
+
+ ! Changed T. Raupach 2020.
+ logical, intent(in), optional:: ideal_evap_flag
+ real(kind=kind_phys), dimension(its:ite), intent(in):: rho1d
+ real(kind=kind_phys), intent(in), optional:: surface_wind
+ ! End changed block.
+
 
  integer,intent(in):: its,ite
  integer,intent(in),optional:: isftcflx, iz0tlnd
@@ -854,7 +864,37 @@
     endif
 
     do 370 i = its,ite
-       qfx(i)=flqc(i)*(qsfc(i)-qx(i))                                     
+       ! Changed T. Raupach 2020.
+       if (ideal_evap_flag .eqv. .true.) then
+           ! Use ideal surface fluxes, as per Chua et al. (2019).
+
+           ! Based on Equation 2 in Chua et al. 2019, where they suggest a
+           ! constant of 0.005 kg m-2 s-1 composed of:
+           !   - drag coefficient of 0.001
+           !   - near-surface air density of 1 kg m-3
+           !   - constant near-surface wind speed of 5 m s-1
+           ! multiplying to 0.001 * 1 * 5 = 0.005 kg m-2 s-1.
+           !
+           ! Here we use variable surface wind speed and near-surface density
+           ! and only assume the drag coefficient of 0.001. The other terms are
+           ! q_sat, the saturated water vapour mixing ratio at the surface
+           ! temperature, q_a, the lowest model level water vapour mixing ratio,
+           ! and L, the latent heat of vaporisation of water (2.5x10^6 J
+           ! kg-1). We use QSFC (ground saturated mixing ratio) for q_sat and QX
+           ! (lowest-level water vapour mixing ratio in kg kg-1) for q_a, and
+           ! XLV is WRF's value of L (applied afterwards).
+
+           ! Units are:
+           ! kg m-2 s-1 = kg m-3   * -     * m s-1        * kg kg-1      
+           qfx(i)       = rho1d(i) * 0.001 * surface_wind * (qsfc(i)-qx(i))
+
+           ! When QFX is multiplied by XLV (L) afterwards the units become: J
+           ! kg-1 kg m-2 s-1 = J s-1 m-2 = W m-2.
+       else
+           qfx(i)=flqc(i)*(qsfc(i)-qx(i))           
+       endif
+       ! End changed block.
+
 !      qfx(i)=amax1(qfx(i),0.)                                            
        lh(i)=xlv*qfx(i)
     370 continue                                                                 
@@ -863,18 +903,54 @@
 !                                                                                
     390 continue                                                                 
     do 400 i = its,ite
-       if(xland(i)-1.5.gt.0.)then                                           
-          hfx(i)=flhc(i)*(thgb(i)-thx(i)) 
-!         if(present(isftcflx)) then
-!            if(isftcflx.ne.0) then
-! AHW: add dissipative heating term (commented out in 3.6.1)
-!               hfx(i)=hfx(i)+rhox(i)*ustm(i)*ustm(i)*wspdi(i)
-!            endif
-!         endif 
-       elseif(xland(i)-1.5.lt.0.)then                                       
-          hfx(i)=flhc(i)*(thgb(i)-thx(i))                                
-!         hfx(i)=amax1(hfx(i),-250.)                                       
-       endif                                                                  
+! Changed T. Raupach 2020.
+        IF (ideal_evap_flag .eqv. .true.) THEN
+            ! Use ideal surface fluxes, as per Chua et al. (2019).
+            
+            ! Based on Equation 1 in Chua et al. 2019, where they suggest a
+            ! constant of 0.005 kg m-1 s-1 composed of:
+            !   - drag coefficient of 0.001
+            !   - near-surface air density of 1 kg m-3
+            !   - constant near-surface wind speed of 5 m s-1
+            ! multiplying to 0.001 * 1 * 5 = 0.005 kg m-1 s-1.
+            !
+            ! Here we use variable surface wind speed and near-surface density
+            ! and only assume the drag coefficient of 0.001. The other terms are
+            ! T_s, the surface temperature, T_a, the lowest model level
+            ! temperature, and c_p, the specific heat capacity of dry air
+            ! (1004.5 J kg-1 K-1). We use QSFC (ground saturated mixing ratio)
+            ! for q_sat and QX (lowest-level water vapour mixing ratio in kg
+            ! kg-1) for q_a, and CP is WRF's value of c_p. HFX is upward heat
+            ! flux at the surface (W m-2).
+            !
+            ! For the surface temperature we use the ideal SST (K).  Near
+            ! surface temperature is temperature at first model level, corrected
+            ! adiabatically to surface temperature. Variables are:
+            !  - CP          heat capacity at constant pressure for dry air (J/kg/K)
+            !  - R           gas constant for dry air (J/kg/K)
+            !  - ROVCP       R/CP (-)
+
+            ! Units are:
+            ! W m-2 = kg m-3   * -     * m s-1        * J kg-1 K-1 * 
+            hfx(i)  = rho1d(i) * 0.001 * surface_wind * cp         * &
+                 (tsk(i) - (((psfcpa(i)/p1d(i))**rovcp)*t1d(i)))
+            !    (K      - (((Pa       / Pa)   ^(-))   *K     ))
+        else
+            if(xland(i)-1.5.gt.0.)then                                           
+                hfx(i)=flhc(i)*(thgb(i)-thx(i)) 
+    !           if(present(isftcflx)) then
+    !               if(isftcflx.ne.0) then
+    ! AHW: add dissipative heating term (commented out in 3.6.1)
+    !                   hfx(i)=hfx(i)+rhox(i)*ustm(i)*ustm(i)*wspdi(i)
+    !               endif
+    !           endif 
+            elseif(xland(i)-1.5.lt.0.)then                                       
+                hfx(i)=flhc(i)*(thgb(i)-thx(i))                                
+    !           hfx(i)=amax1(hfx(i),-250.)                                       
+            endif
+        endif
+        ! End changed block.
+                                                          
    400 continue                                                                 
 
    405 continue                                                                 

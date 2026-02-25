@@ -42,9 +42,6 @@ CONTAINS
     USE module_dm, ONLY : local_communicator, mytask, ntasks, ntasks_x, ntasks_y, local_communicator_periodic, &
                           wrf_dm_maxval, wrf_err_message, local_communicator_x, local_communicator_y
     USE module_comm_dm, ONLY : halo_em_tke_c_sub,halo_em_tke_d_sub,halo_em_tke_e_sub            &
-         ! Changed T. Raupach
-         ,halo_em_phys_windrelax_sub,period_bdy_em_phy_windrelax_sub &
-         ! End changed block
             ,halo_em_phys_pbl_sub,halo_em_phys_shcu_sub &
             ,halo_em_fdda_sub,halo_em_phys_diffusion_sub,halo_em_tke_3_sub &
             ,halo_em_tke_5_sub,halo_obs_nudge_sub,period_bdy_em_a1_sub,period_bdy_em_phy_bc_sub &
@@ -395,11 +392,6 @@ BENCH_START(cal_phy_tend)
         CALL calculate_phy_tend (config_flags,grid%c1h,grid%c2h,       &
                      grid%mut,grid%muu,grid%muv,pi_phy,                &
                      grid%rthraten,                                    &
-                     ! Changed T. Raupach 21.05.2020.
-                     grid%rthforceten, grid%rqvforceten,               &
-                     grid%rthrelaxten, grid%rqvrelaxten,               &
-                     grid%rurelaxten, grid%rvrelaxten,                 &
-                     ! End changed block.
                      grid%rublten,grid%rvblten,grid%rthblten,          &
                      grid%rqvblten,grid%rqcblten,grid%rqiblten,        &
                      grid%rucuten,grid%rvcuten,grid%rthcuten,          &
@@ -668,9 +660,6 @@ BENCH_START(phy_bc_tim)
                       grid%rublten, grid%rvblten,                  &
                       grid%rucuten, grid%rvcuten,                  &
                       grid%rushten, grid%rvshten,                  &
-                      ! Changed T. Raupach.
-                      grid%rurelaxten, grid%rvrelaxten,            &
-                      ! End changed block.
                       grid%gamu, grid%gamv, grid%xkmv_meso,        &  ! XZ
                       ids, ide, jds, jde, kds, kde,                &
                       ims, ime, jms, jme, kms, kme,                &
@@ -742,12 +731,6 @@ ENDIF
        IF ( config_flags%bl_pbl_physics .ge. 1 ) THEN
 #      include "HALO_EM_PHYS_PBL.inc"
        ENDIF
-       ! Changed T. Raupach
-       if ((config_flags%relax_u_winds .eqv. .true.) .or. &
-            (config_flags%relax_v_winds .eqv. .true.)) then
-#      include "HALO_EM_PHYS_WINDRELAX.inc"
-       endif
-       ! End changed block
        IF ( config_flags%shcu_physics .gt. 1 ) THEN
 #      include "HALO_EM_PHYS_SHCU.inc"
        ENDIF
@@ -809,13 +792,7 @@ BENCH_START(update_phy_ten_tim)
 #endif
          CALL update_phy_ten(ph_tendf,t_tendf, ru_tendf, rv_tendf,moist_tend ,&
                            scalar_tend, mu_tendf,                           &
-                           ! Changed T. Raupach 21.05.2020.
-                           grid%rthraten,                                   &
-                           grid%rthforceten, grid%rqvforceten,              &
-                           grid%rthrelaxten, grid%rqvrelaxten,              &
-                           grid%rurelaxten, grid%rvrelaxten,                &
-                           ! End changed block.
-                           grid%rthblten,grid%rthcuten,grid%rthshten,       &
+                           grid%rthraten,grid%rthblten,grid%rthcuten,grid%rthshten, &
                            grid%rublten,grid%rucuten,grid%rushten,          &
                            grid%rvblten,grid%rvcuten,grid%rvshten,          &
                            grid%rqvblten,grid%rqcblten,grid%rqiblten,       &
@@ -1140,3 +1117,4 @@ BENCH_END(hor_diff_tim)
   END SUBROUTINE first_rk_step_part2
 
 END MODULE module_first_rk_step_part2
+

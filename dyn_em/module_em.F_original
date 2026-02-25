@@ -2079,11 +2079,6 @@ end subroutine dump_data
 SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
                      mut,muu,muv,pi3d,                                 &
                      RTHRATEN,                                         &
-                     ! Changed T. Raupach 21.05.2020.
-                     rthforceten, rqvforceten,                         &
-                     rthrelaxten, rqvrelaxten,                         &
-                     rurelaxten, rvrelaxten,                           &
-                     ! End changed block.
                      RUBLTEN,RVBLTEN,RTHBLTEN,                         &
                      RQVBLTEN,RQCBLTEN,RQIBLTEN,                       &
                      RUCUTEN,RVCUTEN,RTHCUTEN,                         &
@@ -2153,14 +2148,6 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
       REAL,     DIMENSION( ims:ime, kms:kme, jms:jme )               , &
                 INTENT(INOUT)   ::                            RUBLTEN, &
                                                               RVBLTEN, &
-                                                              ! Changed T. Raupach 21.05.2020
-                                                              rthforceten, &
-                                                              rqvforceten, &
-                                                              rthrelaxten, &
-                                                              rqvrelaxten, &
-                                                              rurelaxten,  &
-                                                              rvrelaxten,  &
-                                                              ! End changed block.
                                                              RTHBLTEN, &
                                                              RQVBLTEN, &
                                                              RQCBLTEN, &
@@ -2339,59 +2326,6 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
       ENDIF
 
    ENDIF
-
-   ! Changed T. Raupach 22.05.2020.
-   if(config_flags%perturb_t .eqv. .true.) then
-      DO J=jts,jtf
-         DO K=kts,ktf
-            DO I=its,itf
-               rthforceten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rthforceten(I,K,J)
-            ENDDO
-         ENDDO
-      ENDDO
-   endif
-   
-   if((config_flags%perturb_q .eqv. .true.) .and. (P_QV .ge. PARAM_FIRST_SCALAR)) THEN
-      DO J=jts,jtf
-         DO K=kts,ktf
-            DO I=its,itf
-               rqvforceten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rqvforceten(I,K,J)
-            ENDDO
-         ENDDO
-      ENDDO
-   endif
-
-   if(config_flags%relax_stratosphere .eqv. .true.) then
-      DO J=jts,jtf
-         DO K=kts,ktf
-            DO I=its,itf
-               rthrelaxten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rthrelaxten(I,K,J)
-               rqvrelaxten(I,K,J)=(c1(k)*mut(I,J)+c2(k))*rqvrelaxten(I,K,J)
-            ENDDO
-         ENDDO
-      ENDDO
-   endif      
-   
-   if(config_flags%relax_u_winds .eqv. .true.) then
-      DO J=jts,jtf
-         DO K=kts,ktf
-            DO I=its,itf
-               rurelaxten(I,K,J) =(c1(k)*mut(I,J)+c2(k))*rurelaxten(I,K,J)
-            ENDDO
-         ENDDO
-      ENDDO
-   endif
-
-   if(config_flags%relax_v_winds .eqv. .true.) then
-      DO J=jts,jtf
-         DO K=kts,ktf
-            DO I=its,itf
-               rvrelaxten(I,K,J) =(c1(k)*mut(I,J)+c2(k))*rvrelaxten(I,K,J)
-            ENDDO
-         ENDDO
-      ENDDO
-   endif
-   ! End changed block. 
 
 ! pbl
 

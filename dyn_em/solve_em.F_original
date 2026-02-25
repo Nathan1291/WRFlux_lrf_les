@@ -79,18 +79,6 @@ SUBROUTINE solve_em ( grid , config_flags  &
    USE module_avgflx_em, ONLY : zero_avgflx, upd_avgflx
    USE module_cpl, ONLY : coupler_on, cpl_settime, cpl_store_input
 
-   ! Changed by T. Raupach to include light nudging code by Maxime Colin; other
-   ! light-nudging-related changes in this file related to nudging (including
-   ! print_info use) are also based on Maxime's nudging code, cleaned and
-   ! updated to use module_nudging.F. Further changes (inclusion of rthforceten
-   ! and rqvforceten and rurelaxten and rvrelaxten) are independent.
-   USE module_nudging, ONLY: apply_light_nudging
-
-   ! Also include module_LRF for modified versions of Yi-Ling Hwong's
-   ! code for relaxation of stratospheric T and q fields.
-   USE module_LRF, ONLY : read_tq_target_profiles, relax_stratospheric_t_qv
-   ! End changed block.
-
 #if (WRF_CMAQ == 1)
    use twoway_data_module
 #endif
@@ -169,10 +157,6 @@ SUBROUTINE solve_em ( grid , config_flags  &
    LOGICAL                        :: diag_flag
    INTEGER                        :: ke_diag ! tells reflectivity calculation whether to do full depth or only k=1
    LOGICAL                        :: restart_flag !  tells if it is a restart timestep to write restart files. 
-
-   ! Added by Tim Raupach; variable to determine whether debugging information
-   ! should be printed.
-   LOGICAL :: print_info = .TRUE.
    
 #if (WRF_CHEM == 1)
    ! Index cross-referencing array for tendency accumulation
@@ -347,12 +331,6 @@ SUBROUTINE solve_em ( grid , config_flags  &
    tmpTimeInterval2 = domain_get_current_time ( grid ) - domain_get_start_time ( grid )
    curr_secs  = real_time(tmpTimeInterval)
    curr_secs2 = real_time(tmpTimeInterval2)
-
-   ! Changed T. Raupach 11.05.2020.
-   if (print_info .eqv. .TRUE. ) then
-      print *, "curr_secs2 is", curr_secs2
-   endif
-   ! End changed block.
 
    old_dt = grid%dt   ! store old time step for flux averaging code at end of RK loop
 
@@ -565,14 +543,6 @@ SUBROUTINE solve_em ( grid , config_flags  &
                                k_start    , k_end                             )
      END DO
      !$OMP END PARALLEL DO
-
-     ! Changed T. Raupach 11.05.2020.
-     if ( curr_secs2*1./3600. .eq. INT(curr_secs2*1./3600.) ) then
-        print_info = .TRUE.
-     else
-        print_info = .FALSE.
-     endif
-     ! End changed block.
 
 !**********************************************************************
 !
@@ -953,52 +923,6 @@ BENCH_END(rk_tend_tim)
          grid%max_cfl_val = grid%max_vert_cfl
        ENDIF
      ENDIF
-
-     ! Changed T. Raupach 21.05.2020.
-
-     ! If light_nudging is true, then perform light nudging on U and V, for
-     ! stability reasons. Maxime noted: moved (inside solve_em) from
-     ! after_all_rk_steps to just before the beginning of the RK steps (here).
-
-     ! If light_nudging is set, then run nudging on the last Runge-Kutta step.
-     if(config_flags%light_nudging .eqv. .TRUE.) then
-     
-        !$OMP PARALLEL DO   &
-        !$OMP PRIVATE ( ij )
-        DO ij = 1, grid%num_tiles        
-           if (rk_step .eq. rk_order) then
-              if(print_info .eqv. .TRUE.) then
-                 write(6,*) 'Time step:', curr_secs2
-                 write(6,*) 'Performing light nudging for U:'
-              end if
-              CALL apply_light_nudging(varname="U", var_2=grid%u_2, dt_model=grid%dt, &
-                   nudging_time=config_flags%light_nudging_time, &
-                   stagger_x=.true., stagger_y=.false., stagger_z=.false., &
-                   print_info=print_info, &
-                   ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-                   ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-                   its=grid%i_start(ij), ite=grid%i_end(ij), &
-                   jts=grid%j_start(ij), jte=grid%j_end(ij), &
-                   kts=k_start, kte=k_end)
-              
-              if(print_info .eqv. .TRUE.) then
-                 write(6,*) 'Performing light nudging for V:'
-              end if
-              CALL apply_light_nudging(varname="V", var_2=grid%v_2, dt_model=grid%dt, &
-                   nudging_time=config_flags%light_nudging_time, &
-                   stagger_x=.false., stagger_y=.true., stagger_z=.false., &
-                   print_info=print_info, &
-                   ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-                   ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-                   its=grid%i_start(ij), ite=grid%i_end(ij), &
-                   jts=grid%j_start(ij), jte=grid%j_end(ij), &
-                   kts=k_start, kte=k_end)
-           end if
-        END DO
-        !$OMP END PARALLEL DO
-     end if
-     ! End of nudging section ---------------------------------------------------
-     ! End changed block.
 
 BENCH_START(relax_bdy_dry_tim)
      !$OMP PARALLEL DO   &
@@ -3656,11 +3580,6 @@ BENCH_END(advance_ppt_tim)
         CALL phy_prep_part2 ( config_flags,                              &
                         grid%muts, grid%muus, grid%muvs,                 &
                         grid%c1h, grid%c2h, grid%c1f, grid%c2f,          &
-                        ! Changed T. Raupach 21.05.2020.
-                        grid%rthforceten, grid%rqvforceten,              &
-                        grid%rthrelaxten, grid%rqvrelaxten,              &
-                        grid%rurelaxten, grid%rvrelaxten,                & 
-                        ! End changed block.
                         grid%rthraten,                                   &
                         grid%rthblten, grid%rublten, grid%rvblten,       &
                         grid%rqvblten, grid%rqcblten, grid%rqiblten,     &
