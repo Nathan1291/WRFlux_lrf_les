@@ -4,7 +4,7 @@ https://github.com/Nathan1291/wrf_lrf_les
 
 https://github.com/matzegoebel/WRFlux/tree/master
 
-The code can be simply compiled by running:
+The code has been modified so that it can be simply compiled on GADI by running:
 
 ```
 ./run_compile --clean --compile_case em_quarter_ss
