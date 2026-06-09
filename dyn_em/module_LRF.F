@@ -139,77 +139,100 @@ CONTAINS
     enddo
   end subroutine force_LRF
 
-  subroutine relax_winds_to_profile( &
-       uten, vten, u, v, p, tau,     &
-       target_wind_u, target_wind_v, &
-       extend_relaxation_u, extend_relaxation_v, &
-       apply_u, apply_v, relax_mean_wind, &
-       ids, ide, jds, jde, kds, kde, &
-       ims, ime, jms, jme, kms, kme, &
-       ips, ipe, jps, jpe, kps, kpe, &
+subroutine relax_var_to_profile(    &
+       ten, var, p, tau,              &
+       target_profile, extend_relaxation, &
+     relax_means, is_temp, pi,      &
+       ids, ide, jds, jde, kds, kde,   &
+       ims, ime, jms, jme, kms, kme,   &
+       ips, ipe, jps, jpe, kps, kpe,   &
        its, ite, jts, jte, kts, kte)
-    ! Relax U and V winds towards profiles read from file. If extend_relaxation
+    ! Relax given variable toward a profile read from file. If extend_relaxation
     ! is .false. then relax winds above 160 hPa to maximum relaxation at/above
     ! 100 hPa.  If 'extend_relaxation' is .true. then relax the whole
     ! profile. Targets should be given for the whole profile regardless of the
     ! value of extend_relaxation.
     !
     ! ---
-    ! uten, vten: The U and V wind tendency fields [m s-2].
-    ! u, v: The U and V wind fields (at mass points) [m s-1].
+    ! ten: The variable tendency field. 
+    ! var: The variable itself. 
     ! p: Hydrostatic pressure [Pa].
     ! tau: Relaxation time, over which a full relaxation is made [s].
-    ! target_wind_u: The target profile for U [m s-1].
-    ! target_wind_v: The target profile for V [m s-1].
+    ! target_profile: The target profile [m s-1].
     ! extend_relaxation: Extend relaxation to cover whole profile?
-    ! apply_u: Apply relaxation to u winds?
-    ! apply_v: Apply relaxation to v winds?
-    ! relax_mean_wind: Relax the mean of each layer, instead of point-by-point?
+    ! relax_means: Relax the mean of each layer, instead of point-by-point?
     ! ids, ide, jds, jde: kds, kde: Horizontal domain dimensions.
     ! ims, ime, jms, jme, kms, kme: Memory dimensions.
     ! ips, ipe, jps, jpe, kps, kpe: Patch dimensions.
     ! its, ite, jts, jte, kts, kte: Tile dimensions.
+    ! 
+    ! Optional Variables for temperature conversion
+    ! is_temp: Check whether temp is being relaxed. 
+    ! pi: The Exner function (pi_phy in WRF).
 
     implicit none
- 
-    real, dimension(ims:ime, kms:kme, jms:jme), intent(in)    :: u, v, p
-    real, dimension(ims:ime, kms:kme, jms:jme), intent(inout) :: uten, vten
+
+    real, dimension(ims:ime, kms:kme, jms:jme), intent(in)    :: var, p
+    real, dimension(ims:ime, kms:kme, jms:jme), intent(inout) :: ten
     real, intent(in)                 :: tau
-    real, dimension(kte), intent(in) :: target_wind_u, target_wind_v
-    logical, intent(in)              :: extend_relaxation_u, extend_relaxation_v
-    logical, intent(in)              :: apply_u, apply_v, relax_mean_wind
+    real, dimension(kte), intent(in) :: target_profile
+    logical, intent(in)              :: extend_relaxation
+    logical, intent(in)              :: relax_means
     integer, intent(in) :: &
          ids, ide, jds, jde, kds, kde, &
          ims, ime, jms, jme, kms, kme, &
          ips, ipe, jps, jpe, kps, kpe, &
          its, ite, jts, jte, kts, kte
-
+    logical, optional, intent(in)    :: is_temp
+    real, optional, dimension(ims:ime,kms:kme,jms:jme), intent(in)    :: pi
     integer :: i,j,k
     real :: inv_tau
-    real, dimension(kms:kme) :: u_means, v_means
+    real, dimension(kms:kme) :: means
+    real :: relax_value
 
-    ! Relax u winds.
-    if(apply_u .eqv. .true.) then
-       call relax_wind_to_profile(ten=uten, wind=u, p=p, tau=tau, &
-            target_wind=target_wind_u, extend_relaxation=extend_relaxation_u, &
-            relax_mean_wind=relax_mean_wind, &
+    if(relax_means .eqv. .true.) then
+       call horizontal_means(v=var, out=means, &
             ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
             ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
             ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
             its=its, ite=ite, jts=jts, jte=jte, kts=kts, kte=kte)
     endif
-    
-    ! Relax v winds.
-    if(apply_v .eqv. .true.) then
-       call relax_wind_to_profile(ten=vten, wind=v, p=p, tau=tau, &
-            target_wind=target_wind_v, extend_relaxation=extend_relaxation_v, &
-            relax_mean_wind=relax_mean_wind, &
-            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
-            its=its, ite=ite, jts=jts, jte=jte, kts=kts, kte=kte)
-    endif
-  end subroutine relax_winds_to_profile
+
+    ! Relax variable. 
+    do j=jts,min(jte, jde-1)
+       do k=kts,min(kte, kde-1)
+          do i=its,min(ite, ide-1)
+             ! Relax variable only above 160 hPa, or everywhere if
+             ! extend_relaxation is true.
+             if ((extend_relaxation .eqv. .true.) .or. (p(i,k,j) .lt. 16000)) then
+                if ((extend_relaxation .eqv. .true.) .or. (p(i,k,j) .le. 10000)) then
+                   inv_tau = 1/tau
+                else
+                   ! Between 160 hPa and 100 hPa, vary 1/tau linearly from 0 s-1
+                   ! at 160 hPa to 1/tau s-1 at 100 hPa.
+                   inv_tau = (1/tau)*(16000 - p(i,k,j))/6000
+                endif
+
+                if(relax_means .eqv. .true.) then
+                   ! Apply relaxation to shift horizontal means to reference point.
+                   relax_value = (inv_tau * -(means(k) - target_profile(k)))
+                else
+                   ! Apply relaxation point-to-point.
+                   relax_value = (inv_tau * -(var(i,k,j) - target_profile(k)))
+                endif
+
+                if (present(is_temp)) then
+                  if (is_temp) then
+                     relax_value = relax_value / pi(i,k,j)
+                  endif
+               endif
+
+                ten(i,k,j) = ten(i,k,j) + relax_value
+             endif
+          enddo
+       enddo
+    enddo
+  end subroutine relax_var_to_profile
 
   subroutine relax_wind_to_profile(    &
        ten, wind, p, tau,              &
@@ -348,82 +371,6 @@ CONTAINS
        out(k) = sum / count
     enddo
   end subroutine horizontal_means
-  
-  subroutine relax_stratospheric_t_qv(     &
-       t_phy, qv, thten, qvten, p, pi,     &
-       target_t, target_q,                 &
-       ids, ide, jds, jde, kds, kde,       &
-       ims, ime, jms, jme, kms, kme,       &
-       ips, ipe, jps, jpe, kps, kpe,       &
-       its, ite, jts, jte, kts, kte)
-    ! Relax T and q in the stratosphere to match a given target profile, as per
-    ! Figure 1 in Herman and Kuang (2013).
-    !
-    ! ---
-    ! t_phy: Temperature (T) field [K].
-    ! qv: Water vapour mixing ratio field [kg kg-1].
-    ! thten: Potential temperature (theta) tendency field [K s-1].
-    ! qvten: Water vapour tendency field [kg kg-1 s-1].
-    ! p: Hydrostatic pressure [Pa].
-    ! pi: The Exner function (pi_phy in WRF).
-    ! target_t: Target profile for temperature T [K].
-    ! target_q: Target profile for q [kg kg-1].
-    ! ids, ide, jds, jde: kds, kde: Horizontal domain dimensions.
-    ! ims, ime, jms, jme, kms, kme: Memory dimensions.
-    ! ips, ipe, jps, jpe, kps, kpe: Patch dimensions.
-    ! its, ite, jts, jte, kts, kte: Tile dimensions.
-
-    implicit none
-
-    real, dimension(ims:ime,kms:kme,jms:jme), intent(in)    :: t_phy, qv, p, pi
-    real, dimension(ims:ime,kms:kme,jms:jme), intent(inout) :: thten ! dT/dt (K s-1).
-    real, dimension(ims:ime,kms:kme,jms:jme), intent(inout) :: qvten ! dq/dt (kg kg-1 s-1)
-    real, dimension(kte), intent(in) :: target_t, target_q
-    integer, intent(in) :: &
-         ids, ide, jds, jde, kds, kde, &
-         ims, ime, jms, jme, kms, kme, &
-         ips, ipe, jps, jpe, kps, kpe, &
-         its, ite, jts, jte, kts, kte
-    
-    integer :: i, j, k
-    real :: inv_tau, relax_t, relax_q
-
-    do i = its, min(ite, ide-1)
-       do k = kts, min(kte, kde-1)
-          do j = jts, min(jte, jde-1)
-             ! Below 160 hPa, don't do any relaxation of T or q. 
-             if (p(i,k,j) .lt. 16000) then
-                if (p(i,k,j) .le. 10000) then
-                   ! Above 100 hPa, use the full inverse relaxation time. The minimum
-                   ! value of tau is two days in seconds, meaning the maximum
-                   ! inverse relaxation constant (1/tau = inv_tau) is 0.5 day-1
-                   ! as per Herman and Kuang 2013.
-                   inv_tau = 0.5
-                else
-                   ! Between 160 hPa and 100 hPa, vary 1/tau linearly from 0 day-1
-                   ! at 160 hPa to 0.5 day-1 at 100 hPa.
-                   inv_tau = 0.5*(16000 - p(i,k,j))/6000
-                endif
-
-                ! Convert inv_tau from day-1 to s-1.                
-                inv_tau = inv_tau/(24*3600)
-
-                ! Relaxation amount per timestep (convert inv_tau from day-1 to s-1).
-                relax_t = inv_tau * -(t_phy(i,k,j) - target_t(k))
-                relax_q = inv_tau * -(qv(i,k,j) - target_q(k))
-                
-                ! Convert from temperature to potential temperature.
-                relax_t = relax_t / pi(i,k,j)
-                
-                ! Relax the variables by the relaxation amount. Convert temperature
-                ! to potential temperature (theta) for tendency.
-                thten(i,k,j) = thten(i,k,j) + relax_t
-                qvten(i,k,j) = qvten(i,k,j) + relax_q
-             endif
-          enddo
-       enddo
-    enddo
-  end subroutine relax_stratospheric_t_qv
   
   subroutine read_profile_file(num_levels, profile_file, vals)
     ! Read a profile from file. Expect one value per line.
