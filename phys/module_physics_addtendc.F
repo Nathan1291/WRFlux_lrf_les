@@ -154,7 +154,7 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
       endif
    endif
 
-   if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_T_q .eqv. .true.) then
       call add_a2a(rt_tendf, rthrelaxten, config_flags,        &
            ids, ide, jds, jde, kds, kde,                       &
            ims, ime, jms, jme, kms, kme,                       &

@@ -646,9 +646,18 @@ endif
           call wrf_put_dom_ti_real(fid, "WIND_RELAXATION_TIME", &
                config_flags%wind_relaxation_time, 1, ierr)
 
-          tmpint = merge(1.d0, 0.d0, config_flags%relax_stratosphere)
-          call wrf_put_dom_ti_integer(fid, "RELAX_STRATOSPHERE", tmpint, 1, ierr)
+          tmpint = merge(1.d0, 0.d0, config_flags%relax_T_q)
+          call wrf_put_dom_ti_integer(fid, "relax_T_q", tmpint, 1, ierr)
+
+          tmpint = merge(1.d0, 0.d0, config_flags%relax_mean_T_q)
+          call wrf_put_dom_ti_integer(fid, "relax_mean_T_q", tmpint, 1, ierr)
           
+          tmpint = merge(1.d0, 0.d0, config_flags%extend_T_q_relax)
+          call wrf_put_dom_ti_integer(fid, "extend_T_q_relax", tmpint, 1, ierr)
+
+          call wrf_put_dom_ti_real(fid, "tau_T_q_relaxation", &
+               config_flags%tau_T_q_relaxation, 1, ierr)
+
           tmpint = merge(1.d0, 0.d0, config_flags%perturb_t)
           call wrf_put_dom_ti_integer(fid, "PERTURB_T", tmpint, 1, ierr)
 

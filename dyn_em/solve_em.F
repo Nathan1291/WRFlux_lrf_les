@@ -89,7 +89,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
 
    ! Also include module_LRF for modified versions of Yi-Ling Hwong's
    ! code for relaxation of stratospheric T and q fields.
-   USE module_LRF, ONLY : read_tq_target_profiles, relax_stratospheric_t_qv
+   USE module_LRF, ONLY : read_tq_target_profiles, relax_var_to_profile
    ! End changed block.
 
 #if (WRF_CMAQ == 1)

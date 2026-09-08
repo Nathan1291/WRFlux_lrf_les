@@ -5474,7 +5474,7 @@ END SUBROUTINE phy_prep
       ENDDO
    endif
 
-   if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_T_q .eqv. .true.) then
       DO J=j_start,j_end
          DO K=k_start,k_end
             DO I=i_start,i_end

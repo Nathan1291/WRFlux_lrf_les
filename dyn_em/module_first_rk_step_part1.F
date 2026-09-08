@@ -1720,7 +1720,7 @@ BENCH_END(shcu_driver_tim)
 
 ! Changed T. Raupach.
 ! Load target T and q profiles for stratospheric relaxation.
-if((config_flags%relax_stratosphere .eqv. .true.) .and. &
+if((config_flags%relax_T_q .eqv. .true.) .and. &
      (load_target_tq_profiles .eqv. .true.)) then
    call read_tq_target_profiles(num_levels=k_end-k_start, &
         t_profile_file=config_flags%relax_t_profile_file, &
@@ -1772,43 +1772,63 @@ do ij = 1, grid%num_tiles
         jts=grid%j_start(ij), jte=grid%j_end(ij),             &
         kts=k_start, kte=k_end)
 
-   ! Relax winds to given profiles?
-   if((config_flags%relax_u_winds .eqv. .true.) .or. &
-      (config_flags%relax_v_winds .eqv. .true.)) then
-      call relax_winds_to_profile(                               &
-           uten=grid%rurelaxten, vten=grid%rvrelaxten,           &
-           u=grid%u_phy, v=grid%v_phy, p=grid%p_hyd,             &
-           tau=config_flags%wind_relaxation_time,                &
-           target_wind_u=grid%relax_u_target_profile,            &
-           target_wind_v=grid%relax_v_target_profile,            &
-           extend_relaxation_u=config_flags%extend_wind_relax_u, &
-           extend_relaxation_v=config_flags%extend_wind_relax_v, &
-           apply_u=config_flags%relax_u_winds,                   &
-           apply_v=config_flags%relax_v_winds,                   &
-           relax_mean_wind=config_flags%relax_mean_wind,         &
-           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+  ! Relax u? 
+    if(config_flags%relax_u_winds .eqv. .true.) then
+       call relax_var_to_profile(ten=grid%rurelaxten, var=grid%u_phy,   &
+            p=grid%p_hyd, tau=config_flags%wind_relaxation_time,          &
+            target_profile=grid%relax_u_target_profile,                    &
+            extend_relaxation=config_flags%extend_wind_relax_u,           &
+            relax_means=config_flags%relax_mean_wind,                              &
+            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
            its=grid%i_start(ij), ite=grid%i_end(ij),             &
            jts=grid%j_start(ij), jte=grid%j_end(ij),             &
            kts=k_start, kte=k_end)
-   endif
+    endif
+    
+    ! Relax v?
+    if(config_flags%relax_v_winds .eqv. .true.) then
+       call relax_var_to_profile(ten=grid%rvrelaxten, var=grid%v_phy,   &
+            p=grid%p_hyd, tau=config_flags%wind_relaxation_time,          &
+            target_profile=grid%relax_v_target_profile,                    &
+            extend_relaxation=config_flags%extend_wind_relax_v,           &
+            relax_means=config_flags%relax_mean_wind,                              &
+            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=grid%i_end(ij),             &
+           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
+           kts=k_start, kte=k_end)
+    endif
 
-   ! Relax stratospheric T and q?
-   if(config_flags%relax_stratosphere .eqv. .true.) then
-      ! Relax T and q in stratosphere.
-      call relax_stratospheric_t_qv(                             &
-           t_phy=grid%t_phy, qv=moist(ims,kms,jms,P_QV),         &
-           thten=grid%rthrelaxten, qvten=grid%rqvrelaxten,       &
-           p=grid%p_hyd, pi=pi_phy,                              &
-           target_t=grid%relax_t_target_profile,                 &
-           target_q=grid%relax_q_target_profile,                 &
-           ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
-           ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
-           ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
-           its=grid%i_start(ij), ite=min(grid%i_end(ij), ide-1), &
-           jts=grid%j_start(ij), jte=min(grid%j_end(ij), jde-1), &
-           kts=k_start, kte=min(k_end, kde-1))
+    ! Relax T and q?
+    if(config_flags%relax_T_q .eqv. .true.) then
+       call relax_var_to_profile(ten=grid%rthrelaxten, var=grid%t_phy,   &
+            p=grid%p_hyd, tau=config_flags%tau_T_q_relaxation,          &
+            target_profile=grid%relax_t_target_profile,                    &
+            extend_relaxation=config_flags%extend_T_q_relax,           &
+            relax_means=config_flags%relax_mean_T_q,                              &
+            is_temp=.true., pi=pi_phy,                         &
+            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=grid%i_end(ij),             &
+           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
+           kts=k_start, kte=k_end)
+
+
+       call relax_var_to_profile(ten=grid%rqvrelaxten, var=moist(ims,kms,jms,P_QV),   &
+            p=grid%p_hyd, tau=config_flags%tau_T_q_relaxation,          &
+            target_profile=grid%relax_q_target_profile,                    &
+            extend_relaxation=config_flags%extend_T_q_relax,           &
+            relax_means=config_flags%relax_mean_T_q,                              &
+            ids=ids, ide=ide, jds=jds, jde=jde, kds=kds, kde=kde, &
+            ims=ims, ime=ime, jms=jms, jme=jme, kms=kms, kme=kme, &
+            ips=ips, ipe=ipe, jps=jps, jpe=jpe, kps=kps, kpe=kpe, &
+           its=grid%i_start(ij), ite=grid%i_end(ij),             &
+           jts=grid%j_start(ij), jte=grid%j_end(ij),             &
+           kts=k_start, kte=k_end)
    endif
 enddo
 !$OMP END PARALLEL DO

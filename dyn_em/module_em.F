@@ -2677,7 +2677,7 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
       ENDDO
    endif
 
-   if(config_flags%relax_stratosphere .eqv. .true.) then
+   if(config_flags%relax_T_q .eqv. .true.) then
       DO J=jts,jtf
          DO K=kts,ktf
             DO I=its,itf
