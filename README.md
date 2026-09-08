@@ -7,5 +7,5 @@ https://github.com/matzegoebel/WRFlux/tree/master
 The code has been modified so that it can be simply compiled on GADI by running:
 
 ```
-./run_compile --clean --compile_case em_quarter_ss
+./run_compile --clean --compile_case em_les
 ```
